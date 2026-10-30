@@ -1,0 +1,16 @@
+[project]
+name = "sigk"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "opencv-python>=5.0.0.93",
+    "requests>=2.34.2",
+    "torch>=2.15.0",
+]
+
+
+[tool.ruff]
+line-length = 121
+    
