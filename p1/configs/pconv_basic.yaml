@@ -9,16 +9,18 @@ data:
   _target_: p1.inpainting.data.DIV2KDataset
   root: p1/data
   split: train
-  n: 5000
+  num_samples: 10_000
   seed: ${training.seed}
   cut_size: [3, 32]
 
 training:
   experiment_name: pconv_basic
-  device: cpu
-  epochs: 20
+  device: auto
+  epochs: 100
   save_epochs: 10
-  batch_size: 16
+  batch_size: 64
+  num_workers: 8
+  log_every: 1
   lr: 2e-4
   seed: 42
   val_size: 0.2

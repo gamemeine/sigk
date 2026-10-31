@@ -113,7 +113,8 @@ class InpaintingLoss(nn.Module):
         style = 0
         for output, comp, gt in zip(output_features, composite_features, target_features):
             perceptual += F.l1_loss(output, gt) + F.l1_loss(comp, gt)
-            style += F.l1_loss(_gram(output), _gram(gt)) + F.l1_loss(_gram(comp), _gram(gt))
+            target_gram = _gram(gt)
+            style += F.l1_loss(_gram(output), target_gram) + F.l1_loss(_gram(comp), target_gram)
 
         region = F.max_pool2d(mask, 3, stride=1, padding=1)
         horizontal = (composite[:, :, :, 1:] - composite[:, :, :, :-1]).abs()

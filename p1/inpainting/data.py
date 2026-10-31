@@ -94,15 +94,15 @@ def download_and_preprocess(
 
 class DIV2KDataset(Dataset):
     def __init__(
-        self, root: Path, split: str, n: int | None = None, seed: int = 42,
+        self, root: Path, split: str, num_samples: int | None = None, seed: int = 42,
         cut_size: int | list[int] = 3, random_images: bool = True,
     ):
-        if n is not None and n < 1:
-            raise ValueError("n must be positive")
+        if num_samples is not None and num_samples < 1:
+            raise ValueError("num_samples must be positive")
         image_dir = Path(root) / "processed" / "DIV2K" / split
         self.image_paths = sorted(image_dir.glob("*.png"))
 
-        self.n = n
+        self.num_samples = num_samples
         self.random_images = random_images
         self.cut_sizes = [cut_size] if isinstance(cut_size, int) else cut_size
         self.set_seed(seed)
@@ -112,7 +112,7 @@ class DIV2KDataset(Dataset):
         self.rng = Random(seed)
 
     def __len__(self) -> int:
-        return self.n if self.n is not None else len(self.image_paths)
+        return self.num_samples if self.num_samples is not None else len(self.image_paths)
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         if not 0 <= index < len(self):

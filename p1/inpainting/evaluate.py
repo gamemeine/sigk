@@ -147,7 +147,7 @@ if __name__ == "__main__":
             enumerate(seeds), total=args.repeats, desc=f"Cut {cut_size}x{cut_size}", leave=False,
         ):
             test_dataset = DIV2KDataset(
-                root=args.data_dir, split="valid", n=args.samples, seed=seed,
+                root=args.data_dir, split="valid", num_samples=args.samples, seed=seed,
                 cut_size=cut_size, random_images=False,
             )
             for name, model in methods.items():

@@ -5,10 +5,14 @@ from random import Random
 
 import torch
 from torch import nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, get_worker_info
 from tqdm import tqdm
 
 from p1.inpainting.data import DIV2KDataset
+
+
+def seed_worker(worker_id):
+    get_worker_info().dataset.set_seed(torch.initial_seed())
 
 
 def split_train_val(dataset: DIV2KDataset, val_split: float = 0.2, seed: int = 42):
@@ -21,7 +25,7 @@ def split_train_val(dataset: DIV2KDataset, val_split: float = 0.2, seed: int = 4
     train_ds, valid_ds = copy(dataset), copy(dataset)
     train_ds.image_paths = paths[valid_count:]
     valid_ds.image_paths = paths[:valid_count]
-    valid_ds.n = None
+    valid_ds.num_samples = None
     valid_ds.random_images = False
     train_ds.set_seed(seed)
     valid_ds.set_seed(seed)
@@ -45,6 +49,8 @@ class InpaintingTrainer:
         val_size: float = 0.2,
         save_epochs: int = 10,
         resume: bool = False,
+        num_workers: int = 4,
+        log_every: int = 20,
     ):
         model, criterion, device = self.model, self.criterion, self.device
         train_ds, valid_ds = split_train_val(train_ds, val_size, seed)
@@ -58,8 +64,14 @@ class InpaintingTrainer:
         checkpoints_dir = output_dir / "checkpoints"
         checkpoints_dir.mkdir(exist_ok=True)
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-        train_loader = DataLoader(train_ds, batch_size=batch_size)
-        valid_loader = DataLoader(valid_ds, batch_size=batch_size)
+        pin_memory = torch.device(device).type == "cuda"
+        train_generator = torch.Generator()
+        valid_generator = torch.Generator()
+        loader_options = dict(
+            batch_size=batch_size, num_workers=num_workers, pin_memory=pin_memory, worker_init_fn=seed_worker,
+        )
+        train_loader = DataLoader(train_ds, generator=train_generator, **loader_options)
+        valid_loader = DataLoader(valid_ds, generator=valid_generator, **loader_options)
         history = []
         best_loss = float("inf")
         start_epoch = 0
@@ -81,36 +93,39 @@ class InpaintingTrainer:
 
         for epoch in range(start_epoch, epochs):
             train_ds.set_seed(rng.randrange(2**32))
+            train_generator.manual_seed(train_ds.seed)
             model.train()
-            train_loss = 0.0
+            train_loss = torch.zeros((), device=device)
             train_count = 0
             progress = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{epochs}")
-            for cut, mask, target in progress:
-                cut, mask, target = (tensor.to(device) for tensor in (cut, mask, target))
+            for step, (cut, mask, target) in enumerate(progress, 1):
+                cut, mask, target = (tensor.to(device, non_blocking=pin_memory) for tensor in (cut, mask, target))
                 optimizer.zero_grad()
                 prediction = model(cut, mask)
                 loss = criterion(prediction, mask, target)
                 loss.backward()
                 optimizer.step()
-                train_loss += loss.item() * cut.shape[0]
+                train_loss += loss.detach() * cut.shape[0]
                 train_count += cut.shape[0]
-                progress.set_postfix(loss=f"{loss.item():.4f}")
+                if step % log_every == 0 or step == len(train_loader):
+                    progress.set_postfix(loss=f"{loss.item():.4f}")
 
             model.eval()
             valid_ds.set_seed(seed)
-            valid_loss = 0.0
-            hole_error = 0.0
-            hole_values = 0
+            valid_generator.manual_seed(seed)
+            valid_loss = torch.zeros((), device=device)
+            hole_error = torch.zeros((), device=device)
+            hole_values = torch.zeros((), device=device)
             with torch.no_grad():
                 for cut, mask, target in valid_loader:
-                    cut, mask, target = (tensor.to(device) for tensor in (cut, mask, target))
+                    cut, mask, target = (tensor.to(device, non_blocking=pin_memory) for tensor in (cut, mask, target))
                     prediction = model(cut, mask)
-                    valid_loss += criterion(prediction, mask, target).item() * cut.shape[0]
-                    hole_error += ((prediction - target).abs() * mask).sum().item()
-                    hole_values += mask.sum().item() * target.shape[1]
-            train_loss /= train_count
-            valid_loss /= len(valid_ds)
-            valid_hole_mae = hole_error / hole_values
+                    valid_loss += criterion(prediction, mask, target) * cut.shape[0]
+                    hole_error += ((prediction - target).abs() * mask).sum()
+                    hole_values += mask.sum() * target.shape[1]
+            train_loss, valid_loss, valid_hole_mae = torch.stack((
+                train_loss / train_count, valid_loss / len(valid_ds), hole_error / hole_values,
+            )).tolist()
             current_lr = optimizer.param_groups[0]["lr"]
             history.append({
                 "epoch": epoch + 1, "train_loss": train_loss, "valid_loss": valid_loss,

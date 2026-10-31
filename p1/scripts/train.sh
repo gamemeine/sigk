@@ -1,5 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-uv run -m p1.inpainting.modeling.pconv.train \
+source .venv/bin/activate
+
+python -m p1.inpainting.modeling.pconv.train \
+    --config p1/configs/pconv_basic.yaml \
     "$@"
