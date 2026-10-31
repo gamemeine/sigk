@@ -12,9 +12,11 @@ dependencies = [
     "opencv-python>=5.0.0.93",
     "requests>=2.34.2",
     "rich>=15.0.0",
+    "scipy>=1.18.1",
     "torch>=2.15.0",
     "torchmetrics",
     "torchvision",
+    "tqdm>=4.70.1",
 ]
 
 [tool.setuptools]

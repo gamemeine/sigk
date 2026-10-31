@@ -1,21 +1,25 @@
-from datetime import datetime
+import json
 import os
+from datetime import datetime
 from pathlib import Path
 from random import Random
+from statistics import mean
 from typing import Callable
 
 import matplotlib.pyplot as plt
 from rich.console import Console
 from rich.table import Table
+from scipy.stats import sem
 from torch.utils.data import Dataset
 from torchmetrics.image import (
     LearnedPerceptualImagePatchSimilarity,
     PeakSignalNoiseRatio,
     StructuralSimilarityIndexMeasure,
 )
+from tqdm import tqdm
 
-from p1.inpainting.models.baseline import inpaint
 from p1.inpainting.data import DIV2KDataset
+from p1.inpainting.models.baseline import inpaint
 
 
 def evaluate(test_ds: Dataset, inpaint_fun: Callable):
@@ -38,22 +42,33 @@ def evaluate(test_ds: Dataset, inpaint_fun: Callable):
     return {name: metric.compute().item() for name, metric in metrics.items()}, predictions
 
 
-def print_results(results: dict[str, dict[str, float]], output_path: Path, caption=None) -> None:
+def summarize_results(runs: list[dict[str, float]]) -> dict[str, dict[str, float]]:
+    summary = {}
+    for metric in runs[0]:
+        values = [run[metric] for run in runs]
+        summary[metric] = {"mean": mean(values)}
+        if len(values) > 1:
+            summary[metric]["se"] = float(sem(values))
+    return summary
+
+
+def print_results(results: dict[str, dict[str, dict[str, float]]], output_path: Path, caption=None) -> None:
     table = Table("Method", "PSNR ↑", "SSIM ↑", "LPIPS ↓")
     for method, scores in results.items():
-        table.add_row(
-            method,
-            f"{scores['PSNR']:.4f}",
-            f"{scores['SSIM']:.6f}",
-            f"{scores['LPIPS']:.6f}",
-        )
+        cells = []
+        for metric in ("PSNR", "SSIM", "LPIPS"):
+            score = scores[metric]
+            cell = f"{score['mean']:.4f}"
+            if "se" in score:
+                cell += f" ± {score['se']:.4f}"
+            cells.append(cell)
+        table.add_row(method, *cells)
 
     table.caption = caption
     Console().print(table)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w") as f:
-        import json
         json.dump(results, f, indent=2)
 
 
@@ -99,32 +114,38 @@ if __name__ == "__main__":
         default=Path("p1/output") / datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
     )
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--repeats", type=int, default=1)
     parser.add_argument("--examples", type=int, default=15)
-
 
     args = parser.parse_args()
 
+    seeds = Random(args.seed).sample(range(1_000_000), args.repeats)
+    methods = {"no_inpaint": lambda img, mask: img, "opencv_inpaint_telea": inpaint}
     for cut_size in [3, 32]:
-        results = {}
-        test_dataset = DIV2KDataset(root=args.data_dir, split="valid", seed=args.seed, cut_size=cut_size)
-
-        # no inpainting
-        results[f"no_inpaint_{cut_size}_x_{cut_size}"] = evaluate(test_dataset, lambda img, mask: img)
-
-        # opencv Telea
-        results[f"opencv_inpaint_telea_{cut_size}_x_{cut_size}"] = evaluate(test_dataset, inpaint)
+        results = {name: [] for name in methods}
+        predictions = {}
+        for repetition, seed in tqdm(enumerate(seeds), total=args.repeats, desc=f"Cut {cut_size}x{cut_size}", leave=False):
+            test_dataset = DIV2KDataset(root=args.data_dir, split="valid", seed=seed, cut_size=cut_size)
+            for name, method in methods.items():
+                scores, examples = evaluate(test_dataset, method)
+                results[name].append(scores)
+                if repetition == 0:
+                    predictions[name] = examples
 
         # print and plot results
         results_path = args.output_dir / f"results_{cut_size}x{cut_size}.json"
         examples_path = args.output_dir / f"examples_{cut_size}x{cut_size}.png"
 
         print_results(
-            {name: value[0] for name, value in results.items()},
+            {name: summarize_results(runs) for name, runs in results.items()},
             results_path,
-            caption=f"Results for cut size {cut_size}x{cut_size}",
+            caption=(
+                f"Cut {cut_size}x{cut_size}, single seed" if args.repeats == 1
+                else f"Cut {cut_size}x{cut_size}, mean ± SE over {args.repeats} seeds"
+            ),
         )
         plot_predictions(
-            {name: value[1] for name, value in results.items()},
+            predictions,
             examples_path,
             seed=args.seed,
             samples=args.examples,
