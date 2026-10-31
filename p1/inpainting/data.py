@@ -93,23 +93,41 @@ def download_and_preprocess(
 
 
 class DIV2KDataset(Dataset):
-    def __init__(self, root: Path, split: str, seed: int = 42, cut_size: int = 3):
+    def __init__(
+        self, root: Path, split: str, n: int | None = None, seed: int = 42,
+        cut_size: int | list[int] = 3, random_images: bool = True,
+    ):
+        if n is not None and n < 1:
+            raise ValueError("n must be positive")
         image_dir = Path(root) / "processed" / "DIV2K" / split
         self.image_paths = sorted(image_dir.glob("*.png"))
 
+        self.n = n
+        self.random_images = random_images
+        self.cut_sizes = [cut_size] if isinstance(cut_size, int) else cut_size
+        self.set_seed(seed)
+
+    def set_seed(self, seed: int) -> None:
         self.seed = seed
-        self.cut_size = cut_size
+        self.rng = Random(seed)
 
     def __len__(self) -> int:
-        return len(self.image_paths)
+        return self.n if self.n is not None else len(self.image_paths)
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        image_path = self.image_paths[index]
+        if not 0 <= index < len(self):
+            raise IndexError(index)
+        image_path = (
+            self.rng.choice(self.image_paths) if self.random_images
+            else self.image_paths[index % len(self.image_paths)]
+        )
         image = cv2.imread(str(image_path))
         assert image is not None, f"Cannot read image: {image_path}"
 
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        cut_image, mask = random_cut(image, self.cut_size, self.seed + index)
+        cut_size = self.rng.choice(self.cut_sizes)
+        cut_seed = self.rng.getrandbits(32)
+        cut_image, mask = random_cut(image, cut_size, cut_seed)
 
         cut_tensor = torch.from_numpy(cut_image).permute(2, 0, 1).float() / 255
         mask_tensor = torch.from_numpy(mask).unsqueeze(0).float() / 255
