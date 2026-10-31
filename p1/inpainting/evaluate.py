@@ -14,7 +14,7 @@ from torchmetrics.image import (
     StructuralSimilarityIndexMeasure,
 )
 
-from p1.inpainting.baseline import inpaint
+from p1.inpainting.models.baseline import inpaint
 from p1.inpainting.data import DIV2KDataset
 
 
