@@ -8,6 +8,10 @@ from zipfile import ZipFile
 
 import cv2
 import requests
+import torch
+from torch.utils.data import Dataset
+
+from p1.inpainting.utils import random_cut
 
 
 def _preprocess_image(image_path, seed, output_dir, target_res, crop_strategy):
@@ -86,6 +90,32 @@ def download_and_preprocess(
             for _ in executor.map(preprocess, image_paths, seeds):
                 pass
         print(f"Processed {len(image_paths)} {split} images: {processed_dir}", flush=True)
+
+
+class DIV2KDataset(Dataset):
+    def __init__(self, root: Path, split: str, seed: int = 42, cut_size: int = 3):
+        image_dir = Path(root) / "processed" / "DIV2K" / split
+        self.image_paths = sorted(image_dir.glob("*.png"))
+
+        self.seed = seed
+        self.cut_size = cut_size
+
+    def __len__(self) -> int:
+        return len(self.image_paths)
+
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        image_path = self.image_paths[index]
+        image = cv2.imread(str(image_path))
+        assert image is not None, f"Cannot read image: {image_path}"
+
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        cut_image, mask = random_cut(image, self.cut_size, self.seed + index)
+
+        cut_tensor = torch.from_numpy(cut_image).permute(2, 0, 1).float() / 255
+        mask_tensor = torch.from_numpy(mask).unsqueeze(0).float() / 255
+        target_tensor = torch.from_numpy(image).permute(2, 0, 1).float() / 255
+
+        return cut_tensor, mask_tensor, target_tensor
 
 
 if __name__ == "__main__":

@@ -1,16 +1,28 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "sigk"
 version = "0.1.0"
 description = "Add your description here"
-readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "matplotlib>=3.11.2",
     "opencv-python>=5.0.0.93",
     "requests>=2.34.2",
+    "rich>=15.0.0",
     "torch>=2.15.0",
+    "torchmetrics",
+    "torchvision",
 ]
 
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+include = ["p[0-9]*"]
+exclude = ["p*.data*", "p*.scripts*"]
 
 [tool.ruff]
 line-length = 121
-    
