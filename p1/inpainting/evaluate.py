@@ -31,24 +31,36 @@ def load_model(model_dir: Path, device: str = "cpu") -> torch.nn.Module:
     return model.to(device).eval()
 
 
-def evaluate(test_ds: Dataset, model: torch.nn.Module):
+@torch.no_grad()
+def evaluate(test_ds: Dataset, model: torch.nn.Module, device: str = "cpu"):
     metrics = {
         "PSNR": PeakSignalNoiseRatio(data_range=1.0),
         "SSIM": StructuralSimilarityIndexMeasure(data_range=1.0),
         "LPIPS": LearnedPerceptualImagePatchSimilarity(net_type="alex", normalize=True),
     }
+    for metric in metrics.values():
+        metric.to(device).eval()
 
+    hole_error = torch.zeros((), device=device)
+    hole_values = torch.zeros((), device=device)
     predictions = []
     for cut_image, mask, target in test_ds:
         target = target.unsqueeze(0)
         prediction = model.predict(cut_image, mask).unsqueeze(0)
+        metric_prediction = prediction.to(device)
+        metric_target = target.to(device)
+        metric_mask = mask.to(device)
 
         for metric in metrics.values():
-            metric.update(prediction, target)
+            metric.update(metric_prediction, metric_target)
+        hole_error += ((metric_prediction - metric_target).abs() * metric_mask).sum()
+        hole_values += metric_mask.sum() * metric_target.shape[1]
 
         predictions.append((cut_image, mask, target, prediction))
 
-    return {name: metric.compute().item() for name, metric in metrics.items()}, predictions
+    scores = {name: metric.compute().item() for name, metric in metrics.items()}
+    scores["MAE_hole"] = (hole_error / hole_values).item()
+    return scores, predictions
 
 
 def summarize_results(runs: list[dict[str, float]]) -> dict[str, dict[str, float]]:
@@ -62,10 +74,10 @@ def summarize_results(runs: list[dict[str, float]]) -> dict[str, dict[str, float
 
 
 def print_results(results: dict[str, dict[str, dict[str, float]]], output_path: Path, caption=None) -> None:
-    table = Table("Method", "PSNR ↑", "SSIM ↑", "LPIPS ↓")
+    table = Table("Method", "PSNR ↑", "SSIM ↑", "LPIPS ↓", "MAE hole ↓")
     for method, scores in results.items():
         cells = []
-        for metric in ("PSNR", "SSIM", "LPIPS"):
+        for metric in ("PSNR", "SSIM", "LPIPS", "MAE_hole"):
             score = scores[metric]
             cell = f"{score['mean']:.4f}"
             if "se" in score:
@@ -108,6 +120,66 @@ def plot_predictions(predictions: dict, output_path: Path, samples: int = 10, se
     return output_path
 
 
+def run_evaluation(data_dir, output_dir, models=None, seed=42, repeats=1, examples=15, samples=None, device="cpu"):
+    output_dir = Path(output_dir)
+    models = [Path(path) for path in (models or [])]
+    if device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    evaluation_config = {
+        "data_dir": data_dir, "output_dir": output_dir, "models": models,
+        "seed": seed, "repeats": repeats, "examples": examples, "samples": samples, "device": device,
+    }
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "evaluation_config.json").write_text(json.dumps(evaluation_config, indent=2, default=str))
+
+    seeds = Random(seed).sample(range(1_000_000), repeats)
+    methods = {"input": NoInpaintModel(), "opencv_inpaint_telea": TeleaModel()}
+    for model_dir in models:
+        model = load_model(model_dir, device)
+        name = OmegaConf.load(model_dir / "config.yaml").training.experiment_name
+        methods[name] = model
+        Console().print(f"{name}: {model_dir}")
+    results_by_size = {}
+    for cut_size in [3, 32]:
+        results = {name: [] for name in methods}
+        predictions = {}
+        for repetition, cut_seed in tqdm(
+            enumerate(seeds), total=repeats, desc=f"Cut {cut_size}x{cut_size}", leave=False,
+        ):
+            test_dataset = DIV2KDataset(
+                root=data_dir, split="valid", num_samples=samples, seed=cut_seed,
+                cut_size=cut_size, random_images=False,
+            )
+            for name, model in methods.items():
+                scores, model_examples = evaluate(test_dataset, model, device=device)
+                results[name].append(scores)
+                if repetition == 0:
+                    predictions[name] = model_examples
+
+        # print and plot results
+        results_path = output_dir / f"results_{cut_size}x{cut_size}.json"
+        examples_path = output_dir / f"examples_{cut_size}x{cut_size}.png"
+
+        summary = {name: summarize_results(runs) for name, runs in results.items()}
+        results_by_size[cut_size] = summary
+        print_results(
+            summary,
+            results_path,
+            caption=(
+                f"Cut {cut_size}x{cut_size}, single seed" if repeats == 1
+                else f"Cut {cut_size}x{cut_size}, mean ± SE over {repeats} seeds"
+            ),
+        )
+        plot_predictions(
+            predictions,
+            examples_path,
+            seed=seed,
+            samples=examples,
+        )
+
+    return results_by_size
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -130,48 +202,4 @@ if __name__ == "__main__":
     parser.add_argument("--device", default="cpu")
 
     args = parser.parse_args()
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    (args.output_dir / "run_config.json").write_text(json.dumps(vars(args), indent=2, default=str))
-
-    seeds = Random(args.seed).sample(range(1_000_000), args.repeats)
-    methods = {"input": NoInpaintModel(), "opencv_inpaint_telea": TeleaModel()}
-    for model_dir in args.models:
-        model = load_model(model_dir, args.device)
-        name = OmegaConf.load(model_dir / "config.yaml").training.experiment_name
-        methods[name] = model
-        Console().print(f"{name}: {model_dir}")
-    for cut_size in [3, 32]:
-        results = {name: [] for name in methods}
-        predictions = {}
-        for repetition, seed in tqdm(
-            enumerate(seeds), total=args.repeats, desc=f"Cut {cut_size}x{cut_size}", leave=False,
-        ):
-            test_dataset = DIV2KDataset(
-                root=args.data_dir, split="valid", num_samples=args.samples, seed=seed,
-                cut_size=cut_size, random_images=False,
-            )
-            for name, model in methods.items():
-                test_dataset.set_seed(seed)
-                scores, examples = evaluate(test_dataset, model)
-                results[name].append(scores)
-                if repetition == 0:
-                    predictions[name] = examples
-
-        # print and plot results
-        results_path = args.output_dir / f"results_{cut_size}x{cut_size}.json"
-        examples_path = args.output_dir / f"examples_{cut_size}x{cut_size}.png"
-
-        print_results(
-            {name: summarize_results(runs) for name, runs in results.items()},
-            results_path,
-            caption=(
-                f"Cut {cut_size}x{cut_size}, single seed" if args.repeats == 1
-                else f"Cut {cut_size}x{cut_size}, mean ± SE over {args.repeats} seeds"
-            ),
-        )
-        plot_predictions(
-            predictions,
-            examples_path,
-            seed=args.seed,
-            samples=args.examples,
-        )
+    run_evaluation(**vars(args))

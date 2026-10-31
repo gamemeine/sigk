@@ -1,26 +1,35 @@
 model:
   _target_: p1.inpainting.modeling.pconv.model.PartConvModel
-  channels: [32, 64, 128, 256, 256, 256, 256]
+  channels: [64, 128, 256, 512, 512, 512, 512, 512]
 
 loss:
   _target_: p1.inpainting.modeling.pconv.model.InpaintingLoss
+  weights:
+    valid: 1.0
+    hole: 6.0
+    perceptual: 0.05
+    style_out: 120.0
+    style_comp: 120.0
+    tv: 0.1
 
 data:
   _target_: p1.inpainting.data.DIV2KDataset
   root: p1/data
+  crop_size: 256
   split: train
   num_samples: 10_000
   seed: ${training.seed}
   cut_size: [3, 32]
 
 training:
-  experiment_name: pconv_basic
+  experiment_name: pconv_original
   device: auto
-  epochs: 100
+  epochs: 250
   save_epochs: 10
   batch_size: 64
   num_workers: 8
-  log_every: 1
+  log_every: 20
   lr: 2e-4
+  scheduler: null
   seed: 42
-  val_size: 0.2
+  val_size: 0.1

@@ -16,6 +16,7 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=Path, required=True, help="Hydra YAML config")
     parser.add_argument("--output-dir", type=Path, default=None, help="Output directory")
     parser.add_argument("--resume", type=Path, help="Resume from an existing output directory")
+    parser.add_argument("--evaluate", action="store_true", help="Evaluate best.pt after training in the same output directory")
     args = parser.parse_args()
 
     config_path = args.resume / "config.yaml" if args.resume else args.config
@@ -40,6 +41,8 @@ if __name__ == "__main__":
 
     training = OmegaConf.to_container(config.training, resolve=True)
     device = training.pop("device")
+    if device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
     training.pop("experiment_name")
     torch.manual_seed(training["seed"])
 
@@ -49,3 +52,14 @@ if __name__ == "__main__":
 
     trainer = InpaintingTrainer(model, criterion, device=device)
     trainer.train(dataset, output_dir, resume=args.resume is not None, **training)
+    if args.evaluate:
+        from p1.inpainting.evaluate import run_evaluation
+
+        run_evaluation(
+            data_dir=config.data.root,
+            models=[output_dir],
+            output_dir=output_dir,
+            device=device,
+            seed=config.training.seed,
+            repeats=5,
+        )

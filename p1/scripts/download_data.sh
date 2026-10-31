@@ -1,8 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-uv run p1/inpainting/data.py \
-    --output-dir p1/data \
-    --target-res 256 256 \
-    --crop-strategy random \
-    --seed 42
+mkdir -p p1/data/raw/DIV2K
+cd p1/data/raw/DIV2K
+
+for split in train valid; do
+    wget -nc "https://data.vision.ee.ethz.ch/cvl/DIV2K/DIV2K_${split}_HR.zip"
+    unzip -q -n -j "DIV2K_${split}_HR.zip" '*.png' -d "$split"
+done

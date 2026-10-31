@@ -84,8 +84,13 @@ def _gram(features: torch.Tensor) -> torch.Tensor:
 
 
 class InpaintingLoss(nn.Module):
-    def __init__(self):
+    def __init__(self, weights=None):
         super().__init__()
+        self.weights = {
+            "valid": 1.0, "hole": 6.0, "perceptual": 0.05,
+            "style_out": 120.0, "style_comp": 120.0, "tv": 0.1,
+            **(weights or {}),
+        }
         features = vgg16(weights=VGG16_Weights.IMAGENET1K_V1).features
         self.vgg = nn.ModuleList([features[:5], features[5:10], features[10:17]])
         self.vgg.eval().requires_grad_(False)
@@ -100,7 +105,7 @@ class InpaintingLoss(nn.Module):
             features.append(image)
         return features
 
-    def forward(self, prediction: torch.Tensor, mask: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    def forward(self, prediction: torch.Tensor, mask: torch.Tensor, target: torch.Tensor, return_components=False):
         error = (prediction - target).abs()
         valid = ((1 - mask) * error).mean()
         hole = (mask * error).mean()
@@ -110,11 +115,13 @@ class InpaintingLoss(nn.Module):
         composite_features = self._features(composite)
         target_features = self._features(target)
         perceptual = 0
-        style = 0
+        style_out = 0
+        style_comp = 0
         for output, comp, gt in zip(output_features, composite_features, target_features):
             perceptual += F.l1_loss(output, gt) + F.l1_loss(comp, gt)
             target_gram = _gram(gt)
-            style += F.l1_loss(_gram(output), target_gram) + F.l1_loss(_gram(comp), target_gram)
+            style_out += F.l1_loss(_gram(output), target_gram)
+            style_comp += F.l1_loss(_gram(comp), target_gram)
 
         region = F.max_pool2d(mask, 3, stride=1, padding=1)
         horizontal = (composite[:, :, :, 1:] - composite[:, :, :, :-1]).abs()
@@ -123,4 +130,11 @@ class InpaintingLoss(nn.Module):
         tv += (vertical * region[:, :, 1:, :] * region[:, :, :-1, :]).sum()
         tv /= target.numel()
 
-        return valid + 6 * hole + 0.05 * perceptual + 120 * style + 0.1 * tv
+        components = {
+            "valid": valid, "hole": hole, "perceptual": perceptual,
+            "style_out": style_out, "style_comp": style_comp, "tv": tv,
+        }
+        loss = sum(self.weights[name] * value for name, value in components.items())
+        if return_components:
+            return loss, components
+        return loss
