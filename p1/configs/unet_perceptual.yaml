@@ -1,0 +1,6 @@
+defaults:
+  - unet_valid
+  - _self_
+
+loss:
+  perceptual_weight: 5e-2

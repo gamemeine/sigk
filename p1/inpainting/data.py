@@ -3,6 +3,7 @@ from pathlib import Path
 from random import Random
 
 import cv2
+import numpy as np
 import torch
 from torch.utils.data import Dataset
 
@@ -13,6 +14,7 @@ class DIV2KDataset(Dataset):
     def __init__(
         self, root: Path, split: str, num_samples: int | None = None, seed: int = 42,
         cut_size: int | list[int] = 3, random_images: bool = True, crop_size: int = 256,
+        augment: bool = False,
     ):
         if num_samples is not None and num_samples < 1:
             raise ValueError("num_samples must be positive")
@@ -22,6 +24,7 @@ class DIV2KDataset(Dataset):
         self.num_samples = num_samples
         self.random_images = random_images
         self.crop_size = crop_size
+        self.augment = augment
         self.cut_sizes = [cut_size] if isinstance(cut_size, int) else cut_size
         self.set_seed(seed)
 
@@ -51,6 +54,13 @@ class DIV2KDataset(Dataset):
         left = rng.randint(0, width - self.crop_size)
         image = image[top:top + self.crop_size, left:left + self.crop_size]
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        if self.augment:
+            if rng.random() < 0.5:
+                image = np.flip(image, axis=1)
+            if rng.random() < 0.5:
+                image = np.flip(image, axis=0)
+            image = np.ascontiguousarray(np.rot90(image, rng.randrange(4)))
+
         cut_size = rng.choice(self.cut_sizes)
         cut_seed = rng.getrandbits(32)
         cut_image, mask = random_cut(image, cut_size, cut_seed)

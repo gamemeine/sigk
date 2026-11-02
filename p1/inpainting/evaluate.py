@@ -24,7 +24,7 @@ from p1.inpainting.data import DIV2KDataset
 
 
 @torch.no_grad()
-def evaluate(test_ds: Dataset, device: str = "cpu"):
+def evaluate(test_ds: Dataset, device: str = "cpu", model=None):
     metrics = {
         "PSNR": PeakSignalNoiseRatio(data_range=1.0),
         "SSIM": StructuralSimilarityIndexMeasure(data_range=1.0),
@@ -36,13 +36,21 @@ def evaluate(test_ds: Dataset, device: str = "cpu"):
     }
     for metric in (*metrics.values(), *hole_metrics.values()):
         metric.to(device).eval()
+    if model is not None:
+        model.to(device).eval()
 
     predictions = []
     for cut_image, mask, target in test_ds:
-        image = (cut_image.permute(1, 2, 0).numpy() * 255).round().astype(np.uint8)
-        hole = mask.squeeze(0).numpy().astype(np.uint8)
-        restored = cv2.inpaint(image, hole, 3.0, cv2.INPAINT_TELEA)
-        prediction = torch.from_numpy(restored).permute(2, 0, 1).float().unsqueeze(0) / 255
+        if model is None:
+            image = (cut_image.permute(1, 2, 0).numpy() * 255).round().astype(np.uint8)
+            hole = mask.squeeze(0).numpy().astype(np.uint8)
+            restored = cv2.inpaint(image, hole, 3.0, cv2.INPAINT_TELEA)
+            prediction = torch.from_numpy(restored).permute(2, 0, 1).float() / 255
+        else:
+            inputs = torch.cat([cut_image, mask]).unsqueeze(0).to(device)
+            prediction = model(inputs).squeeze(0).cpu()
+            prediction = cut_image * (1 - mask) + prediction * mask
+        prediction = prediction.unsqueeze(0)
         target = target.unsqueeze(0)
         metric_prediction = prediction.to(device)
         metric_target = target.to(device)
@@ -100,9 +108,10 @@ def print_results(results: dict[str, dict[str, dict[str, float]]], output_path: 
         json.dump(results, f, indent=2)
 
 
-def plot_predictions(predictions: list, output_path: Path, samples: int = 10, seed: int = 42) -> Path:
-    indices = Random(seed).sample(range(len(predictions)), min(samples, len(predictions)))
-    titles = ["input", "opencv_inpaint_telea", "original"]
+def plot_predictions(predictions: dict, output_path: Path, samples: int = 10, seed: int = 42) -> Path:
+    examples = next(iter(predictions.values()))
+    indices = Random(seed).sample(range(len(examples)), min(samples, len(examples)))
+    titles = ["input", *predictions, "original"]
     figure, axes = plt.subplots(
         len(indices),
         len(titles),
@@ -112,7 +121,8 @@ def plot_predictions(predictions: list, output_path: Path, samples: int = 10, se
     )
 
     for row, index in enumerate(indices):
-        for column, image in enumerate(predictions[index]):
+        images = [examples[index][0], *(values[index][1] for values in predictions.values()), examples[index][2]]
+        for column, image in enumerate(images):
             axes[row, column].imshow(image.permute(1, 2, 0).numpy())
             axes[row, column].axis("off")
             if row == 0:
@@ -124,13 +134,22 @@ def plot_predictions(predictions: list, output_path: Path, samples: int = 10, se
     return output_path
 
 
-def run_evaluation(data_dir, output_dir, seed=42, repeats=1, examples=15, samples=None, device="cpu"):
+def run_evaluation(data_dir, output_dir, seed=42, repeats=1, examples=15, samples=None, device="cpu", model=None):
     output_dir = Path(output_dir)
     if device == "auto":
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        if torch.cuda.is_available():
+            device = "cuda"
+        elif torch.backends.mps.is_available():
+            device = "mps"
+        else:
+            device = "cpu"
+    methods = {"opencv_inpaint_telea": None}
+    if model is not None:
+        methods["residual_unet"] = model
     evaluation_config = {
         "data_dir": data_dir, "output_dir": output_dir,
         "seed": seed, "repeats": repeats, "examples": examples, "samples": samples, "device": device,
+        "methods": list(methods),
     }
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "evaluation_config.json").write_text(json.dumps(evaluation_config, indent=2, default=str))
@@ -138,7 +157,8 @@ def run_evaluation(data_dir, output_dir, seed=42, repeats=1, examples=15, sample
     seeds = Random(seed).sample(range(1_000_000), repeats)
     results_by_size = {}
     for cut_size in [3, 32]:
-        runs = []
+        runs = {name: [] for name in methods}
+        predictions = {}
         for repetition, cut_seed in tqdm(
             enumerate(seeds), total=repeats, desc=f"Cut {cut_size}x{cut_size}", leave=False,
         ):
@@ -146,16 +166,17 @@ def run_evaluation(data_dir, output_dir, seed=42, repeats=1, examples=15, sample
                 root=data_dir, split="valid", num_samples=samples, seed=cut_seed,
                 cut_size=cut_size, random_images=False,
             )
-            scores, examples_for_seed = evaluate(test_dataset, device=device)
-            runs.append(scores)
-            if repetition == 0:
-                predictions = examples_for_seed
+            for name, method in methods.items():
+                scores, examples_for_seed = evaluate(test_dataset, device=device, model=method)
+                runs[name].append(scores)
+                if repetition == 0:
+                    predictions[name] = examples_for_seed
 
         # print and plot results
         results_path = output_dir / f"results_{cut_size}x{cut_size}.json"
         examples_path = output_dir / f"examples_{cut_size}x{cut_size}.png"
 
-        summary = {"opencv_inpaint_telea": summarize_results(runs)}
+        summary = {name: summarize_results(method_runs) for name, method_runs in runs.items()}
         results_by_size[cut_size] = summary
         print_results(
             summary,

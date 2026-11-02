@@ -1,0 +1,49 @@
+output_dir: null
+seed: 42
+device: auto
+validation_images: 40
+masks_per_image: 10
+steps: 2000
+validation_every: 100
+max_grad_norm: 1.0
+precision: auto
+
+model:
+  _target_: p1.inpainting.modeling.unet.model.ResidualUNet
+  channels: [32, 64, 128, 256]
+  blocks_per_level: 2
+
+loss:
+  _target_: p1.inpainting.modeling.loss.InpaintingLoss
+  l1_weight: 1.0
+  mse_weight: 0.0
+  valid_weight: 0.0
+  gradient_weight: 0.0
+  perceptual_weight: 0.0
+  style_weight: 0.0
+  tv_weight: 0.0
+  perceptual_crop_size: 64
+
+dataset:
+  _target_: p1.inpainting.data.DIV2KDataset
+  root: p1/data
+  split: train
+  seed: ${seed}
+  crop_size: 256
+  cut_size: 32
+
+loader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: 16
+  num_workers: 4
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 2e-4
+  betas: [0.9, 0.999]
+  weight_decay: 1e-4
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+  T_max: ${steps}
+  eta_min: 1e-5
