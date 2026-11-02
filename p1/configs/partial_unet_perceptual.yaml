@@ -1,0 +1,6 @@
+defaults:
+  - unet_perceptual
+  - _self_
+
+model:
+  _target_: p1.inpainting.modeling.partial_unet.model.PartialUNet

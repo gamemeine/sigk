@@ -145,7 +145,7 @@ def run_evaluation(data_dir, output_dir, seed=42, repeats=1, examples=15, sample
             device = "cpu"
     methods = {"opencv_inpaint_telea": None}
     if model is not None:
-        methods["residual_unet"] = model
+        methods[type(model).__name__] = model
     evaluation_config = {
         "data_dir": data_dir, "output_dir": output_dir,
         "seed": seed, "repeats": repeats, "examples": examples, "samples": samples, "device": device,
