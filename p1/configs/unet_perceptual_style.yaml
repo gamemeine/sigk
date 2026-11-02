@@ -1,0 +1,9 @@
+defaults:
+  - unet
+  - _self_
+
+loss:
+  gradient_weight: 1e-1 
+  valid_weight: 1e-1
+  perceptual_weight: 1e-1
+  style_weight: 1.0

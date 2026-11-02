@@ -3,7 +3,7 @@ seed: 42
 device: auto
 validation_images: 40
 masks_per_image: 10
-steps: 2000
+steps: 5000
 validation_every: 100
 max_grad_norm: 1.0
 precision: auto

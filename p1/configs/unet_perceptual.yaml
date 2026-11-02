@@ -1,6 +1,8 @@
 defaults:
-  - unet_valid
+  - unet
   - _self_
 
 loss:
-  perceptual_weight: 5e-2
+  gradient_weight: 1e-1 
+  valid_weight: 1e-1
+  perceptual_weight: 1e-1
