@@ -3,6 +3,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from random import Random
+from time import perf_counter
 
 import torch
 from hydra import compose, initialize_config_dir
@@ -93,6 +94,8 @@ def train(config, config_name="unet"):
 
     best_psnr = float("-inf")
     losses = []
+    metrics = []
+    start_time = perf_counter()
     for step, (cut_images, masks, targets) in enumerate(tqdm(train_loader, total=config.steps), start=1):
         model.train()
         cut_images, masks, targets = (tensor.to(device) for tensor in (cut_images, masks, targets))
@@ -110,8 +113,16 @@ def train(config, config_name="unet"):
 
         if step % config.validation_every == 0 or step == config.steps:
             scores = validate(model, validation_loader, device, loss_fn, output_dir / "examples.png")
+            train_loss = sum(losses) / len(losses)
+            metrics.append({
+                "step": step, "elapsed_seconds": perf_counter() - start_time,
+                "train_loss": train_loss, "validation_loss": scores["loss"],
+                "lr": optimizer.param_groups[0]["lr"],
+                "PSNR_hole": scores["PSNR_hole"], "MAE_hole": scores["MAE_hole"],
+            })
+            (output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2))
             tqdm.write(
-                f"[{step}/{config.steps}] Train loss: {sum(losses) / len(losses):.4f}, "
+                f"[{step}/{config.steps}] Train loss: {train_loss:.4f}, "
                 f"Validation loss: {scores['loss']:.4f}, "
                 f"LR: {optimizer.param_groups[0]['lr']:.2e}"
             )
