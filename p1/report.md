@@ -67,29 +67,18 @@ Punktem wyjścia jest Masked L1, czyli średni bezwzględny błąd kolorów w dz
 
 Dla `InpaintingLoss` końcowa strata ma postać:
 
-$$
-\mathcal{L}_{Inpainting} =
-\lambda_{hole}\mathcal{L}_{hole}
-+ \lambda_{valid}\mathcal{L}_{valid}
-+ \lambda_{gradient}\mathcal{L}_{gradient}
-+ \lambda_{perceptual}\mathcal{L}_{perceptual}
-+ \lambda_{style}\mathcal{L}_{style}
-+ \lambda_{tv}\mathcal{L}_{tv}.
-$$
+```math
+\mathcal{L}_{\mathrm{Inpainting}} = \lambda_{hole}\mathcal{L}_{hole} + \lambda_{valid}\mathcal{L}_{valid} + \lambda_{gradient}\mathcal{L}_{gradient} + \lambda_{perceptual}\mathcal{L}_{perceptual} + \lambda_{style}\mathcal{L}_{style} + \lambda_{tv}\mathcal{L}_{tv}.
+```
 
 
 `PartConvLoss` zawiera Hole L1, Valid L1, perceptual, style i TV, bez składnika gradientowego:
 
-$$
-\mathcal{L}_{PartConv} =
-\lambda_{hole}\mathcal{L}_{hole}
-+ \lambda_{valid}\mathcal{L}_{valid}
-+ \lambda_{perceptual}\mathcal{L}_{perceptual}
-+ \lambda_{style}\left(\mathcal{L}_{style_{out}} + \mathcal{L}_{style_{comp}}\right)
-+ \lambda_{tv}\mathcal{L}_{tv}.
-$$
+```math
+\mathcal{L}_{\mathrm{PartConv}} = \lambda_{hole}\mathcal{L}_{hole} + \lambda_{valid}\mathcal{L}_{valid} + \lambda_{perceptual}\mathcal{L}_{perceptual} + \lambda_{style}\left(\mathcal{L}_{\mathrm{style,out}} + \mathcal{L}_{\mathrm{style,comp}}\right) + \lambda_{tv}\mathcal{L}_{tv}.
+```
 
-Składniki $\mathcal{L}_{style_{out}}$ i $\mathcal{L}_{style_{comp}}$ dotyczą odpowiednio surowego wyjścia i obrazu z wklejoną rekonstrukcją.
+Składniki `style_out` i `style_comp` dotyczą odpowiednio surowego wyjścia i obrazu z wklejoną rekonstrukcją.
 
 ### Eksperymenty
 
