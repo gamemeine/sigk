@@ -1,9 +1,9 @@
 defaults:
-  - unet_perceptual
-  - _self_
-
+- base
+- _self_
 model:
   _target_: p1.inpainting.modeling.partial_unet.model.PartialUNet
-
 loss:
-  perceptual_weight: 5e-2
+  valid_weight: 0.1
+  gradient_weight: 5
+  perceptual_weight: 0.1

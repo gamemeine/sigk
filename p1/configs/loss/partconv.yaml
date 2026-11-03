@@ -1,0 +1,6 @@
+_target_: p1.inpainting.modeling.loss.PartConvLoss
+hole_weight: 64.0
+valid_weight: 1e-1
+perceptual_weight: 1e-2
+style_weight: 1.0
+tv_weight: 1e-1

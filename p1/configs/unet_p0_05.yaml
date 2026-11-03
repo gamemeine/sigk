@@ -1,0 +1,11 @@
+defaults:
+- base
+- _self_
+steps: 2000
+loss:
+  valid_weight: 0.1
+  gradient_weight: 0.1
+  perceptual_weight: 0.05
+loader:
+  batch_size: 16
+  num_workers: 4

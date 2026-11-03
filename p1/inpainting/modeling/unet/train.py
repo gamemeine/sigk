@@ -79,8 +79,12 @@ def train(config, config_name="unet"):
         config.dataset, num_samples=len(validation_paths) * config.masks_per_image, random_images=False,
     )
     validation_dataset.image_paths = validation_paths
-    train_loader = instantiate(config.loader, dataset=train_dataset, pin_memory=device.type == "cuda")
-    validation_loader = instantiate(config.loader, dataset=validation_dataset, pin_memory=device.type == "cuda")
+    loader_options = {
+        "pin_memory": device.type == "cuda",
+        "persistent_workers": config.loader.num_workers > 0,
+    }
+    train_loader = instantiate(config.loader, dataset=train_dataset, **loader_options)
+    validation_loader = instantiate(config.loader, dataset=validation_dataset, **loader_options)
 
     model = instantiate(config.model).to(device)
     loss_fn = instantiate(config.loss).to(device).eval()
@@ -152,7 +156,7 @@ def train(config, config_name="unet"):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=Path, default=Path("p1/configs/unet.yaml"))
+    parser.add_argument("--config", type=Path, default=Path("p1/configs/unet_p0_1.yaml"))
     args = parser.parse_args()
     with initialize_config_dir(version_base=None, config_dir=str(args.config.resolve().parent)):
         config = compose(config_name=args.config.stem)

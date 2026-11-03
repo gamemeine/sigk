@@ -1,0 +1,12 @@
+defaults:
+- base
+- _self_
+model:
+  _target_: p1.inpainting.modeling.partial_unet.model.PartialUNet
+loss:
+  valid_weight: 0.1
+  gradient_weight: 0.1
+  perceptual_weight: 0.1
+loader:
+  batch_size: 64
+  num_workers: 32

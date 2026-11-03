@@ -33,7 +33,7 @@ class PartialBlock(nn.Module):
 
 
 class PartialUNet(nn.Module):
-    def __init__(self, channels=(32, 64, 128, 256), blocks_per_level=2):
+    def __init__(self, channels=(32, 64, 128, 256), blocks_per_level=2, head_init_scale=1.0):
         super().__init__()
         self.stem = PartialConv2d(3, channels[0])
         self.encoder = nn.ModuleList(nn.ModuleList(PartialBlock(c) for _ in range(blocks_per_level)) for c in channels)
@@ -49,6 +49,8 @@ class PartialUNet(nn.Module):
             if isinstance(layer, nn.Conv2d):
                 nn.init.kaiming_normal_(layer.weight, nonlinearity="relu")
                 nn.init.zeros_(layer.bias)
+        with torch.no_grad():
+            self.head.weight.mul_(head_init_scale)
 
     def forward(self, inputs):
         x = inputs[:, :3]

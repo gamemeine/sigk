@@ -1,3 +1,7 @@
+defaults:
+  - loss: inpainting
+  - _self_
+
 output_dir: null
 seed: 42
 device: auto
@@ -13,17 +17,6 @@ model:
   channels: [32, 64, 128, 256]
   blocks_per_level: 2
 
-loss:
-  _target_: p1.inpainting.modeling.loss.InpaintingLoss
-  l1_weight: 1.0
-  mse_weight: 0.0
-  valid_weight: 0.0
-  gradient_weight: 0.0
-  perceptual_weight: 0.0
-  style_weight: 0.0
-  tv_weight: 0.0
-  perceptual_crop_size: 64
-
 dataset:
   _target_: p1.inpainting.data.DIV2KDataset
   root: p1/data
@@ -34,8 +27,8 @@ dataset:
 
 loader:
   _target_: torch.utils.data.DataLoader
-  batch_size: 16
-  num_workers: 4
+  batch_size: 8
+  num_workers: 2
 
 optimizer:
   _target_: torch.optim.AdamW
