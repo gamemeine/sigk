@@ -2,6 +2,148 @@
 
 Grzegorz Statkiewicz, Mikołaj Różycki
 
+## 2. Odszumianie
+
+Celem zadania jest usunięcie szumu gaussowskiego o odchyleniu standardowym σ = 0.01 i 0.03 z obrazów DIV2K w rozdzielczości 256×256. Metodą bazową jest filtr bilateralny `skimage.restoration.denoise_bilateral`.
+
+### Dane
+
+Wykorzystano obrazy DIV2K High Resolution: 800 do treningu (0001–0800), 50 do walidacji (0801–0850) i 50 do testu (0851–0900). Dwa ostatnie podzbiory wydzielono ze zbioru walidacyjnego DIV2K; nie jest to oficjalny test konkursowy. Podczas treningu losowano wycinki 256×256, a podczas walidacji i testu wybierano wycinek centralny. Do obrazów w zakresie [0, 1] dodawano szum z rozkładu $\mathcal{N}(0,\sigma^2)$ i ograniczano otrzymane wartości do [0, 1]. Wszystkie metody oceniano na tych samych zaszumionych obrazach.
+
+W modelach DnCNN V2 i V3 zastosowano augmentację geometryczną: losowe odbicia poziome i pionowe oraz obroty o wielokrotność 90°. W V4 porównano trening bez tych przekształceń (×1) z augmentacją ×4, w której dla jednego wycinka wykorzystuje się cztery wersje: oryginał, odbicie poziome, odbicie pionowe i obrót o 90°. Szum dodawano po przekształceniu obrazu. Oba warianty V4 trenowano na 4800 próbkach na epokę przez 14 epok, więc ×4 nie oznacza czterokrotnie większej liczby aktualizacji wag.
+
+### Metryki
+
+Jakość oceniano na całych obrazach za pomocą **PSNR** (błąd rekonstrukcji, więcej = lepiej), **SSIM** (podobieństwo strukturalne, więcej = lepiej) oraz **LPIPS** (podobieństwo percepcyjne, mniej = lepiej). W tabelach podano średnie wyników z 50 obrazów, osobno dla σ = 0.01 i 0.03.
+
+### Podejście i modele
+
+#### Filtr bilateralny
+
+Filtr bilateralny uśrednia wartości pikseli, uwzględniając odległości przestrzenne i różnice kolorów. Parametry filtra dobrano na zbiorze walidacyjnym oddzielnie dla obu wartości σ. W wynikach uwzględniono również zaszumione obrazy bez odszumiania.
+
+#### DnCNN V2 i V3
+
+Zastosowano sieć DnCNN z 17 warstwami konwolucyjnymi 3×3 i 64 kanałami wewnętrznymi. Wejście stanowi obraz RGB z dodatkowym kanałem informującym o poziomie szumu. Sieć przewiduje szum, który jest następnie odejmowany od wejścia. V3 korzysta z tej samej architektury, ale został dotrenowany z wag V2 przy użyciu innej funkcji straty.
+
+| Stage | Channels | Size | Operation |
+|---|---:|---|---|
+| Input | 4 | 256×256 | RGB + poziom szumu |
+| Initial conv | 64 | 256×256 | Conv 3×3 + ReLU |
+| Middle | 64 | 256×256 | 15 × (Conv 3×3 + BatchNorm + ReLU) |
+| Output | 3 | 256×256 | Conv 3×3, oszacowanie szumu |
+
+#### DRUNet-Lite
+
+Uproszczony U-Net z blokami rezydualnymi i połączeniami pomiędzy encoderem a decoderem. Model przetwarza obraz na trzech poziomach rozdzielczości i przewiduje szum do odjęcia od wejścia.
+
+| Stage | Channels | Size | Operation |
+|---|---:|---|---|
+| Encoder 1 | 32 | 256×256 | Conv, 2 residual blocks |
+| Encoder 2 | 64 | 128×128 | Downsample, 2 residual blocks |
+| Bottleneck | 96 | 64×64 | Downsample, 3 residual blocks |
+| Decoder 2 | 64 | 128×128 | Upsample, skip connection, 2 residual blocks |
+| Decoder 1 | 32 | 256×256 | Upsample, skip connection, 2 residual blocks |
+| Output | 3 | 256×256 | Conv, oszacowanie szumu |
+
+#### ResCrossAttention
+
+Model łączy osiem bloków rezydualnych z mechanizmem cross-attention. Mechanizm ten zestawia cechy lokalne z cechami z osobnej gałęzi kontekstowej, dzięki czemu sieć może wykorzystać informacje z większego obszaru obrazu.
+
+| Stage | Channels | Size | Operation |
+|---|---:|---|---|
+| Input | 4 | 256×256 | RGB + poziom szumu |
+| Local features | 64 | 256×256 | Conv, 4 residual blocks |
+| Context branch | 64 | 32×32 | 3 strided convs |
+| Cross-attention | 64 | Q: 16×16, K/V: 8×8 | MultiheadAttention, 4 heads |
+| Refinement | 64 | 256×256 | Połączenie cech, 4 residual blocks |
+| Output | 3 | 256×256 | Conv, oszacowanie szumu |
+
+### Funkcja straty
+
+W V2 zastosowano MSE błędu odszumiania znormalizowanego przez poziom szumu:
+
+```math
+\mathcal{L}_{\mathrm{MSE}} = \frac{1}{N}\sum_{i=1}^{N}\left(\frac{\hat{x}_i-x_i}{\sigma}\right)^2.
+```
+
+W V3 i V4 dodano składnik uwzględniający podobieństwo strukturalne:
+
+```math
+\mathcal{L} = \mathcal{L}_{\mathrm{MSE}} + \lambda_{\mathrm{SSIM}}(1-\mathrm{SSIM}(\hat{x},x)), \qquad \lambda_{\mathrm{SSIM}}=1.
+```
+
+### Eksperymenty
+
+| Parameter | DnCNN V2 | DnCNN V3 | V4 (cztery warianty) |
+|---|---:|---:|---:|
+| Epochs | 30 | 18 (dotrenowanie) | 14 |
+| Samples per epoch | 2400 | 4800 | 4800 |
+| Batch size | 4 | 16 | 32 |
+| Optimizer | Adam | AdamW | AdamW |
+| Initial learning rate | 0.0003 | 0.00003 | 0.0002 |
+| Weight decay | 0 | 0.0001 | 0.0001 |
+| Scheduler | CosineAnnealingLR | CosineAnnealingLR | CosineAnnealingLR |
+| Loss | MSE | MSE + SSIM | MSE + SSIM |
+| Augmentation | Geometryczna | Geometryczna | ×1 lub ×4 |
+
+Poniżej przedstawiono wyniki testu na obrazach 0851–0900. Pogrubiono wyniki lepsze od filtra bilateralnego, a najlepsze wartości w danej kolumnie dodatkowo podkreślono.
+
+#### Szum gaussowski σ = 0.01
+
+| Method | Model | Augmentation | PSNR ↑ | SSIM ↑ | LPIPS ↓ |
+|---|---|---|---:|---:|---:|
+| noisy | Obraz zaszumiony | — | 40.0523 | 0.96919 | **0.00678** |
+| bilateral | skimage bilateral | — | 41.0547 | 0.98288 | 0.00758 |
+| dncnn_v2 | DnCNN V2 | Geometryczna | **43.1224** | **0.98621** | **0.00598** |
+| dncnn_v3 | DnCNN V3 | Geometryczna | **43.1564** | **0.98635** | **0.00602** |
+| drunet_lite | DRUNet-Lite | ×1 | **43.8075** | **0.99011** | **0.00298** |
+| rescross | ResCrossAttention | ×1 | <u>**43.9616**</u> | <u>**0.99036**</u> | <u>**0.00285**</u> |
+| drunet_lite_x4 | DRUNet-Lite | ×4 | **43.8130** | **0.99014** | **0.00299** |
+| rescross_x4 | ResCrossAttention | ×4 | **43.9572** | **0.99033** | **0.00286** |
+
+#### Szum gaussowski σ = 0.03
+
+| Method | Model | Augmentation | PSNR ↑ | SSIM ↑ | LPIPS ↓ |
+|---|---|---|---:|---:|---:|
+| noisy | Obraz zaszumiony | — | 30.5902 | 0.81370 | 0.07383 |
+| bilateral | skimage bilateral | — | 33.8665 | 0.92006 | 0.04650 |
+| dncnn_v2 | DnCNN V2 | Geometryczna | **34.5560** | 0.91305 | 0.06371 |
+| dncnn_v3 | DnCNN V3 | Geometryczna | **34.6176** | 0.91424 | 0.06339 |
+| drunet_lite | DRUNet-Lite | ×1 | **36.9004** | **0.96131** | **0.02103** |
+| rescross | ResCrossAttention | ×1 | **37.1245** | <u>**0.96210**</u> | **0.02295** |
+| drunet_lite_x4 | DRUNet-Lite | ×4 | **36.9107** | **0.96146** | <u>**0.02090**</u> |
+| rescross_x4 | ResCrossAttention | ×4 | <u>**37.1252**</u> | **0.96203** | **0.02286** |
+
+#### Wpływ augmentacji ×4
+
+Przy porównaniu modeli z tą samą architekturą augmentacja ×4 przyniosła niewielką poprawę dla DRUNet-Lite: dla σ = 0.03 PSNR wzrósł z 36.9004 do 36.9107 dB, a LPIPS zmniejszył się z 0.02103 do 0.02090. Dla ResCrossAttention różnice między wariantami są minimalne. Nie wykazano więc jednoznacznej przewagi augmentacji ×4.
+
+#### Wizualizacje
+
+![Porównanie wyników odszumiania](figures/denoising/example_comparison.png)
+
+![PSNR dla σ = 0.01](figures/denoising/psnr_0.01.png)
+
+![PSNR dla σ = 0.03](figures/denoising/psnr_0.03.png)
+
+#### Wnioski
+
+Obie architektury V4 uzyskały lepsze wyniki niż DnCNN V2, V3 i filtr bilateralny we wszystkich metrykach dla obu wartości σ. Najwyższy PSNR osiągnął ResCrossAttention (43.9616 dB dla σ = 0.01 oraz 37.1252 dB dla σ = 0.03 w wariancie ×4). Przy silniejszym szumie najwyższy SSIM uzyskał ResCrossAttention bez augmentacji ×4 (0.96210), a najniższy LPIPS DRUNet-Lite ×4 (0.02090). Różnice między wersjami ×1 i ×4 są niewielkie; eksperymenty przeprowadzono tylko dla jednego seeda.
+
+### Uruchomienie eksperymentu
+
+Komendy wykonujemy z katalogu głównego repozytorium. Po pobraniu DIV2K można wytrenować wszystkie cztery warianty V4 i uruchomić wspólny benchmark:
+
+```bash
+python -m pip install -r p1/denoising/requirements.txt
+bash p1/scripts/download_data.sh
+bash p1/scripts/denoising/train_v4.sh --variant all --multi-gpu
+bash p1/scripts/denoising/benchmark.sh
+```
+
+Wyniki i wagi znajdują się w `p1/output/denoising/` i `p1/checkpoints/denoising/`.
+
 ## 4. Inpainting
 
 Celem zadania jest wypełnienie dziur 3x3 i 32x32 w obrazach ze zbioru DIV2K w rozdzielczości 256x256.

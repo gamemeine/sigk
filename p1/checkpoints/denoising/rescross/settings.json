@@ -1,0 +1,24 @@
+{
+  "architecture": "rescross",
+  "model_config": {
+    "width": 64
+  },
+  "augmentation_x4": false,
+  "settings": {
+    "seed": 42,
+    "epochs": 14,
+    "batch": 32,
+    "samples_per_epoch": 4800,
+    "patch_size": 256,
+    "lr": 0.0002,
+    "lr_min": 1e-06,
+    "ssim_weight": 1.0,
+    "ema_decay": 0.999,
+    "workers": 4,
+    "amp": true,
+    "multi_gpu": true,
+    "drunet_width": 32,
+    "rescross_width": 64
+  },
+  "model_params": 702284
+}

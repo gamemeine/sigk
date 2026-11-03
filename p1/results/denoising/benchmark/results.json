@@ -1,0 +1,200 @@
+{
+  "split": "DIV2K_valid_HR 0851..0900 (internal held-out, NOT official DIV2K test)",
+  "images": [
+    "0851",
+    "0852",
+    "0853",
+    "0854",
+    "0855",
+    "0856",
+    "0857",
+    "0858",
+    "0859",
+    "0860",
+    "0861",
+    "0862",
+    "0863",
+    "0864",
+    "0865",
+    "0866",
+    "0867",
+    "0868",
+    "0869",
+    "0870",
+    "0871",
+    "0872",
+    "0873",
+    "0874",
+    "0875",
+    "0876",
+    "0877",
+    "0878",
+    "0879",
+    "0880",
+    "0881",
+    "0882",
+    "0883",
+    "0884",
+    "0885",
+    "0886",
+    "0887",
+    "0888",
+    "0889",
+    "0890",
+    "0891",
+    "0892",
+    "0893",
+    "0894",
+    "0895",
+    "0896",
+    "0897",
+    "0898",
+    "0899",
+    "0900"
+  ],
+  "seed": 123,
+  "noise_definition": "V2/V3 fixed_noise(clean,sigma,123,image_index), clipped to [0,1]",
+  "patch": 256,
+  "lpips": true,
+  "methods": [
+    "DnCNN V2",
+    "DnCNN V3",
+    "DRUNet-Lite",
+    "ResCrossAttention",
+    "DRUNet-Lite ×4",
+    "ResCrossAttention ×4"
+  ],
+  "missing_checkpoints": [],
+  "bilateral_config": "/kaggle/input/datasets/mikoajrycki/sigk-dncnn-v2-checkpoint/bilateral_val_tuned.json",
+  "results": [
+    {
+      "sigma": 0.01,
+      "method": "Bilateral (skimage)",
+      "images": 50,
+      "PSNR": 41.054655879106434,
+      "SSIM": 0.9828839039802552,
+      "LPIPS": 0.007582463135477156
+    },
+    {
+      "sigma": 0.01,
+      "method": "DRUNet-Lite",
+      "images": 50,
+      "PSNR": 43.80753627961223,
+      "SSIM": 0.9901055347919464,
+      "LPIPS": 0.0029757853876799345
+    },
+    {
+      "sigma": 0.01,
+      "method": "DRUNet-Lite ×4",
+      "images": 50,
+      "PSNR": 43.812958026404466,
+      "SSIM": 0.990136182308197,
+      "LPIPS": 0.002986746300011873
+    },
+    {
+      "sigma": 0.01,
+      "method": "DnCNN V2",
+      "images": 50,
+      "PSNR": 43.122365169666864,
+      "SSIM": 0.9862133550643921,
+      "LPIPS": 0.00598129652091302
+    },
+    {
+      "sigma": 0.01,
+      "method": "DnCNN V3",
+      "images": 50,
+      "PSNR": 43.156388736112994,
+      "SSIM": 0.9863450765609741,
+      "LPIPS": 0.00602067464729771
+    },
+    {
+      "sigma": 0.01,
+      "method": "Noisy (no processing)",
+      "images": 50,
+      "PSNR": 40.05228862869723,
+      "SSIM": 0.9691871118545532,
+      "LPIPS": 0.00677801021374762
+    },
+    {
+      "sigma": 0.01,
+      "method": "ResCrossAttention",
+      "images": 50,
+      "PSNR": 43.96158270182513,
+      "SSIM": 0.9903589272499085,
+      "LPIPS": 0.002853956961771473
+    },
+    {
+      "sigma": 0.01,
+      "method": "ResCrossAttention ×4",
+      "images": 50,
+      "PSNR": 43.957189197023425,
+      "SSIM": 0.9903305304050446,
+      "LPIPS": 0.002860213953536004
+    },
+    {
+      "sigma": 0.03,
+      "method": "Bilateral (skimage)",
+      "images": 50,
+      "PSNR": 33.866490966561145,
+      "SSIM": 0.9200642442703247,
+      "LPIPS": 0.04650063695386052
+    },
+    {
+      "sigma": 0.03,
+      "method": "DRUNet-Lite",
+      "images": 50,
+      "PSNR": 36.900416627529566,
+      "SSIM": 0.9613069200515747,
+      "LPIPS": 0.02103445307351649
+    },
+    {
+      "sigma": 0.03,
+      "method": "DRUNet-Lite ×4",
+      "images": 50,
+      "PSNR": 36.910672695925385,
+      "SSIM": 0.9614648485183716,
+      "LPIPS": 0.02090343023650348
+    },
+    {
+      "sigma": 0.03,
+      "method": "DnCNN V2",
+      "images": 50,
+      "PSNR": 34.556026688498534,
+      "SSIM": 0.9130511868000031,
+      "LPIPS": 0.06370991136878729
+    },
+    {
+      "sigma": 0.03,
+      "method": "DnCNN V3",
+      "images": 50,
+      "PSNR": 34.61761586824422,
+      "SSIM": 0.9142402112483978,
+      "LPIPS": 0.06338551050052046
+    },
+    {
+      "sigma": 0.03,
+      "method": "Noisy (no processing)",
+      "images": 50,
+      "PSNR": 30.590230319431747,
+      "SSIM": 0.8136978673934937,
+      "LPIPS": 0.07383341817185282
+    },
+    {
+      "sigma": 0.03,
+      "method": "ResCrossAttention",
+      "images": 50,
+      "PSNR": 37.12450412675984,
+      "SSIM": 0.9621017718315125,
+      "LPIPS": 0.022953326255083083
+    },
+    {
+      "sigma": 0.03,
+      "method": "ResCrossAttention ×4",
+      "images": 50,
+      "PSNR": 37.12517145130119,
+      "SSIM": 0.9620331203937531,
+      "LPIPS": 0.02285918075591326
+    }
+  ],
+  "smoke": false
+}

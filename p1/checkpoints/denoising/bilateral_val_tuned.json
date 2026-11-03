@@ -1,0 +1,161 @@
+{
+  "protocol": "validation only: 0801-0850; PSNR optimization",
+  "n_images": 50,
+  "seed": 123,
+  "best": {
+    "sigma_0.01": {
+      "sigma_spatial": 3.0,
+      "sigma_color_multiplier": 0.5
+    },
+    "sigma_0.03": {
+      "sigma_spatial": 3.0,
+      "sigma_color_multiplier": 0.5
+    }
+  },
+  "trials": [
+    {
+      "sigma": 0.01,
+      "sigma_spatial": 1.0,
+      "sigma_color_multiplier": 0.5,
+      "val_PSNR": 39.60889863664662
+    },
+    {
+      "sigma": 0.01,
+      "sigma_spatial": 1.0,
+      "sigma_color_multiplier": 1.0,
+      "val_PSNR": 36.93966201001249
+    },
+    {
+      "sigma": 0.01,
+      "sigma_spatial": 1.0,
+      "sigma_color_multiplier": 1.5,
+      "val_PSNR": 34.94369700484626
+    },
+    {
+      "sigma": 0.01,
+      "sigma_spatial": 1.0,
+      "sigma_color_multiplier": 2.0,
+      "val_PSNR": 33.4540522180487
+    },
+    {
+      "sigma": 0.01,
+      "sigma_spatial": 2.0,
+      "sigma_color_multiplier": 0.5,
+      "val_PSNR": 40.88246908799896
+    },
+    {
+      "sigma": 0.01,
+      "sigma_spatial": 2.0,
+      "sigma_color_multiplier": 1.0,
+      "val_PSNR": 38.56444988935382
+    },
+    {
+      "sigma": 0.01,
+      "sigma_spatial": 2.0,
+      "sigma_color_multiplier": 1.5,
+      "val_PSNR": 36.45213952989132
+    },
+    {
+      "sigma": 0.01,
+      "sigma_spatial": 2.0,
+      "sigma_color_multiplier": 2.0,
+      "val_PSNR": 34.79623512901892
+    },
+    {
+      "sigma": 0.01,
+      "sigma_spatial": 3.0,
+      "sigma_color_multiplier": 0.5,
+      "val_PSNR": 41.19888658217879
+    },
+    {
+      "sigma": 0.01,
+      "sigma_spatial": 3.0,
+      "sigma_color_multiplier": 1.0,
+      "val_PSNR": 38.933962922920784
+    },
+    {
+      "sigma": 0.01,
+      "sigma_spatial": 3.0,
+      "sigma_color_multiplier": 1.5,
+      "val_PSNR": 36.72691968706644
+    },
+    {
+      "sigma": 0.01,
+      "sigma_spatial": 3.0,
+      "sigma_color_multiplier": 2.0,
+      "val_PSNR": 34.9781080080416
+    },
+    {
+      "sigma": 0.03,
+      "sigma_spatial": 1.0,
+      "sigma_color_multiplier": 0.5,
+      "val_PSNR": 32.8818451783901
+    },
+    {
+      "sigma": 0.03,
+      "sigma_spatial": 1.0,
+      "sigma_color_multiplier": 1.0,
+      "val_PSNR": 30.85311692416043
+    },
+    {
+      "sigma": 0.03,
+      "sigma_spatial": 1.0,
+      "sigma_color_multiplier": 1.5,
+      "val_PSNR": 29.00253384571351
+    },
+    {
+      "sigma": 0.03,
+      "sigma_spatial": 1.0,
+      "sigma_color_multiplier": 2.0,
+      "val_PSNR": 27.6587478032223
+    },
+    {
+      "sigma": 0.03,
+      "sigma_spatial": 2.0,
+      "sigma_color_multiplier": 0.5,
+      "val_PSNR": 33.96039505924936
+    },
+    {
+      "sigma": 0.03,
+      "sigma_spatial": 2.0,
+      "sigma_color_multiplier": 1.0,
+      "val_PSNR": 32.00727634388671
+    },
+    {
+      "sigma": 0.03,
+      "sigma_spatial": 2.0,
+      "sigma_color_multiplier": 1.5,
+      "val_PSNR": 29.897124658404973
+    },
+    {
+      "sigma": 0.03,
+      "sigma_spatial": 2.0,
+      "sigma_color_multiplier": 2.0,
+      "val_PSNR": 28.352083134570474
+    },
+    {
+      "sigma": 0.03,
+      "sigma_spatial": 3.0,
+      "sigma_color_multiplier": 0.5,
+      "val_PSNR": 34.07133989018456
+    },
+    {
+      "sigma": 0.03,
+      "sigma_spatial": 3.0,
+      "sigma_color_multiplier": 1.0,
+      "val_PSNR": 32.03948271587586
+    },
+    {
+      "sigma": 0.03,
+      "sigma_spatial": 3.0,
+      "sigma_color_multiplier": 1.5,
+      "val_PSNR": 29.811772503732165
+    },
+    {
+      "sigma": 0.03,
+      "sigma_spatial": 3.0,
+      "sigma_color_multiplier": 2.0,
+      "val_PSNR": 28.17024607354097
+    }
+  ]
+}

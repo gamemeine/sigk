@@ -1,0 +1,8 @@
+method,images,seconds,images_per_second,note
+Bilateral (skimage),100,54.01254599399908,1.8514217050814497,CPU bilateral filter
+DnCNN V2,100,3.0711194329851423,32.56141683255852,GPU model forward only (single-image)
+DnCNN V3,100,4.592648011985148,21.773930799625013,GPU model forward only (single-image)
+DRUNet-Lite,100,2.81565977498758,35.515654585945526,GPU model forward only (single-image)
+ResCrossAttention,100,5.984644906013273,16.709429142491253,GPU model forward only (single-image)
+DRUNet-Lite ×4,100,2.4518286290040123,40.78588479514665,GPU model forward only (single-image)
+ResCrossAttention ×4,100,5.7913827689990285,17.26703345102569,GPU model forward only (single-image)
